@@ -55,15 +55,18 @@ function err(string $msg, bool $exit = true): void {
 }
 
 function usage(): void {
-    echo "\nUsage:\n".
-         "  php book_cli.php add      \"系列\" 集數 [store] [date] [notes]\n".
-         "  php book_cli.php latest   \"系列關鍵字\"\n".
-         "  php book_cli.php list     [系列關鍵字] [--no-date]\n".
-         "  php book_cli.php list-all [系列關鍵字]\n".
-         "  php book_cli.php batch    <txt 檔名 | -> <store> [date]\n\n".
-         "  batch : 每行 <系列名稱> <集數>；檔名預設於 ./batch_file/；'-' 代表 STDIN\n\n";
+    echo "\nUsage:\n" .
+         "  php book_cli.php add      \"系列\" 集數 [store] [date] [notes]\n" .
+         "  php book_cli.php latest   \"系列關鍵字\"\n" .
+         "  php book_cli.php list     [系列關鍵字] [--no-date]\n" .
+         "  php book_cli.php list-all [系列關鍵字]\n" .
+         "  php book_cli.php batch    <txt 檔名 | -> <store> [date]\n" .
+         "  php book_cli.php delete   <id>\n\n" .
+         "  batch : 每行 <系列名稱> <集數>；檔名預設於 ./batch_file/；'-' 代表 STDIN\n" .
+         "  delete: 根據編號刪除紀錄，執行前會提示確認\n\n";
     exit;
 }
+
 
 //---------------------------------------------
 // 解析指令
@@ -117,6 +120,12 @@ switch ($cmd) {
     case 'list-all':
         $kw = $argv[2] ?? '';
         listTable($pdo, $kw);
+        break;
+
+    case 'delete':
+        if ($argc < 3) err('delete 需要一個 ID');
+        $id = (int)$argv[2];
+        deleteById($pdo, $id);
         break;
 
     default:
@@ -182,7 +191,7 @@ function showLatest(PDO $pdo,string $kw){
 }
 
 function listTable(PDO $pdo,string $kw){
-    $sql='SELECT p1.series,p1.volume,p1.store,p1.bought_at,p1.notes FROM purchases p1
+    $sql='SELECT p1.id, p1.series,p1.volume,p1.store,p1.bought_at,p1.notes FROM purchases p1
           INNER JOIN (SELECT series,MAX(volume) mv FROM purchases GROUP BY series) p2
           ON p1.series=p2.series AND p1.volume=p2.mv';
     $params=[];
@@ -191,10 +200,11 @@ function listTable(PDO $pdo,string $kw){
     $stmt=$pdo->prepare($sql);$stmt->execute($params);
     $rows=$stmt->fetchAll(PDO::FETCH_ASSOC);
     if(!$rows){echo "(無資料)\n";return;}
-    printf("%-20s %-6s %-10s %-12s %-20s\n",'系列','集數','通路','日期','備註');
+    printf("%-4s %-20s %-6s %-10s %-12s %-20s\n",'編號','系列','集數','通路','日期','備註');
     echo str_repeat('-',75)."\n";
     foreach($rows as $r){
-        printf("%-20s %6d %-10s %-12s %-20s\n",
+        printf("%-4s %-20s %6d %-10s %-12s %-20s\n",
+            $r['id'],
             mb_strimwidth($r['series'],0,20,'…','UTF-8'),
             $r['volume'],
             $r['store']?:'—',
@@ -230,4 +240,33 @@ function listSimple(PDO $pdo,string $kw,bool $showDate=true){
         }
     }
 }
+
+function deleteById(PDO $pdo, int $id): void {
+    $stmt = $pdo->prepare('SELECT * FROM purchases WHERE id = :id');
+    $stmt->execute([':id' => $id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$row) {
+        echo "❌ 找不到編號為 {$id} 的資料。\n";
+        return;
+    }
+
+    // 顯示將刪除的資料摘要
+    $summary = "🗑️  即將刪除：{$row['series']} 第 {$row['volume']} 集，購於 {$row['bought_at']}（通路：{$row['store']}）";
+    echo "$summary\n";
+
+    // 使用者確認
+    echo "請確認是否刪除？(y/N): ";
+    $input = trim(fgets(STDIN));
+    if (strtolower($input) !== 'y') {
+        echo "🚫 已取消刪除。\n";
+        return;
+    }
+
+    $del = $pdo->prepare('DELETE FROM purchases WHERE id = :id');
+    $del->execute([':id' => $id]);
+    echo "✅ 已刪除編號 {$id} 的紀錄。\n";
+}
+
+
 ?>
