@@ -62,6 +62,7 @@ function usage(): void {
          "  php book_cli.php list-all [系列關鍵字]\n" .
          "  php book_cli.php batch    <txt 檔名 | -> <store> [date]\n" .
          "  php book_cli.php delete   <id>\n\n" .
+         "  php book_cli.php fuzzy-series [threshold]   # 比對書名相似度 (預設 0.8)\n" .
          "  batch : 每行 <系列名稱> <集數>；檔名預設於 ./batch_file/；'-' 代表 STDIN\n" .
          "  delete: 根據編號刪除紀錄，執行前會提示確認\n\n";
     exit;
@@ -127,6 +128,15 @@ switch ($cmd) {
         $id = (int)$argv[2];
         deleteById($pdo, $id);
         break;
+        
+    case 'fuzzy-series':
+        $threshold = $argv[2] ?? 0.8;
+        if (!is_numeric($threshold) || $threshold <= 0 || $threshold > 1) {
+            err('fuzzy-series 的相似度閾值必須是 0 到 1 之間的小數（例如 0.85）');
+        }
+        similarSeries($pdo, (float)$threshold);
+        break;
+
 
     default:
         err("未知指令：$cmd\n", false);
@@ -268,5 +278,33 @@ function deleteById(PDO $pdo, int $id): void {
     echo "✅ 已刪除編號 {$id} 的紀錄。\n";
 }
 
+function similarSeries(PDO $pdo, float $threshold = 0.8): void {
+    $rows = $pdo->query("SELECT DISTINCT series FROM purchases")->fetchAll(PDO::FETCH_COLUMN);
+    $count = count($rows);
+
+    $pairs = [];
+    for ($i = 0; $i < $count; $i++) {
+        for ($j = $i + 1; $j < $count; $j++) {
+            $a = $rows[$i];
+            $b = $rows[$j];
+
+            similar_text($a, $b, $percent);
+            if ($percent >= $threshold * 100) {
+                $pairs[] = [$a, $b, round($percent, 2)];
+            }
+        }
+    }
+
+    if (empty($pairs)) {
+        echo "✅ 沒有發現相似書名。\n";
+        return;
+    }
+
+    echo "🔍 發現可能為相同系列的書名（相似度 ≥ " . ($threshold * 100) . "%）：\n";
+    foreach ($pairs as $pair) {
+        list($a, $b, $score) = $pair;
+        echo "  - [$score%]  「 $a 」 ≈ 「 $b 」\n";
+    }
+}
 
 ?>
