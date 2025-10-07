@@ -80,7 +80,7 @@ switch ($cmd) {
     case 'add':
         if ($argc < 4) err('add 需要：系列 集數 [store] [date] [notes]');
         [$series, $vol] = [$argv[2], (int)$argv[3]];
-        $store = $argv[4] ?? '';
+        $store = $argv[4] ?? '博客來';
         $date  = $argv[5] ?? date('Y-m-d');
         $notes = $argv[6] ?? '';
         if(!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) err('日期格式須為 YYYY-MM-DD');
