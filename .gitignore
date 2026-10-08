@@ -15,3 +15,6 @@ ehthumbs.db
 
 # Environment
 .env
+
+# Windows 下載標記檔
+*:Zone.Identifier

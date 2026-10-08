@@ -2,7 +2,7 @@
 <?php
 /**
  * book_cli.php — 離線購書追蹤 CLI
- * SQLite：./sqlite/books.db
+ * SQLite：./sqlite/books.db（可用環境變數 BOOKS_DB 覆寫）
  *
  * 欄位：series, volume, store, notes, bought_at
  *   - bought_at：購買日期 (YYYY-MM-DD)。未傳入時預設為新增當天日期
@@ -19,11 +19,12 @@
 // 路徑設定
 //---------------------------------------------
 $baseDir  = dirname(__FILE__);
-$dbDir    = $baseDir . '/sqlite';
 $batchDir = $baseDir . '/batch_file';
+// 可用環境變數 BOOKS_DB 指定 DB 路徑（例如放在 Google Drive 內多台電腦共用）
+$dbFile   = getenv('BOOKS_DB') ?: $baseDir . '/sqlite/books.db';
+$dbDir    = dirname($dbFile);
 if (!is_dir($dbDir))    mkdir($dbDir, 0755, true);
 if (!is_dir($batchDir)) mkdir($batchDir, 0755, true);
-$dbFile   = $dbDir . '/books.db';
 
 //---------------------------------------------
 // 初始化資料庫
